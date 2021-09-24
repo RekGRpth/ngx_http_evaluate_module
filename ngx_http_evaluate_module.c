@@ -176,7 +176,7 @@ static void *ngx_http_location_create_loc_conf(ngx_conf_t *cf) {
 static char *ngx_http_location_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     ngx_http_evaluate_loc_conf_t *prev = parent;
     ngx_http_evaluate_loc_conf_t *conf = child;
-    ngx_conf_merge_ptr_value(conf->location, prev->location, NGX_CONF_UNSET_PTR);
+    if (ngx_conf_merge_array_value(&conf->location, &prev->location, NGX_CONF_UNSET_PTR) != NGX_OK) return NGX_CONF_ERROR;
     return NGX_CONF_OK;
 }
 
