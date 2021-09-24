@@ -117,19 +117,19 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
 }
 
 static ngx_int_t ngx_http_evaluate_header_filter(ngx_http_request_t *r) {
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
     if (r == r->main) return ngx_http_next_header_filter(r);
     ngx_http_evaluate_context_t *context = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
     if (!context) return ngx_http_next_header_filter(r);
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
 //    r->filter_need_in_memory = 1;
     return NGX_OK;
 }
 
 static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_t *in) {
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
     if (r == r->main) return ngx_http_next_body_filter(r, in);
     ngx_http_variable_value_t *value = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
     if (!value) return ngx_http_next_body_filter(r, in);
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
     for (ngx_chain_t *cl = in; cl; cl = cl->next) {
         if (!ngx_buf_in_memory(cl->buf)) continue;
         value->len += cl->buf->last - cl->buf->pos;
