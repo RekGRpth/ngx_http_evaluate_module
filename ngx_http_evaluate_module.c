@@ -97,10 +97,10 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
     if (!context/* || context->type != ngx_http_evaluate_request*/) {
         if (!(context = ngx_pcalloc(r->pool, sizeof(*context)))) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
 //        context->type = ngx_http_evaluate_request;
+        context->index = location[context->location].index;
         ngx_http_set_ctx(r, context, ngx_http_evaluate_module);
     }
     if (context->done) return NGX_DECLINED;
-    context->index = location[context->location].index;
 //    if (context->location == loc_conf->location->nelts) return /*context->rc == NGX_OK || context->rc == NGX_HTTP_OK ? */NGX_DECLINED/* : context->rc*/;
 //    ngx_http_post_subrequest_t *psr = ngx_palloc(r->pool, sizeof(*psr));
 //    if (!psr) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_palloc"); return NGX_ERROR; }
@@ -114,6 +114,7 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
     ngx_http_evaluate_context_t *subcontext = ngx_pcalloc(r->pool, sizeof(*subcontext));
     if (!subcontext) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     subcontext->index = context->index;
+    subcontext->index = location[context->location].index;
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "subcontext->index = %i", subcontext->index);
     subcontext->location = context->location;
 //    subcontext->type = ngx_http_evaluate_subrequest;
