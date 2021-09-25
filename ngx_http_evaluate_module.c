@@ -8,6 +8,7 @@ typedef enum {
 typedef struct {
     ngx_http_evaluate_type_t type;
     ngx_uint_t index;
+    ngx_uint_t location;
 } ngx_http_evaluate_context_t;
 
 typedef struct {
@@ -97,22 +98,24 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
         context->type = ngx_http_evaluate_request;
         ngx_http_set_ctx(r, context, ngx_http_evaluate_module);
     }
-    if (context->index == loc_conf->location->nelts) return /*context->rc == NGX_OK || context->rc == NGX_HTTP_OK ? */NGX_DECLINED/* : context->rc*/;
+    context->index = location[context->location].index;
+    if (context->location == loc_conf->location->nelts) return /*context->rc == NGX_OK || context->rc == NGX_HTTP_OK ? */NGX_DECLINED/* : context->rc*/;
 //    ngx_http_post_subrequest_t *psr = ngx_palloc(r->pool, sizeof(*psr));
 //    if (!psr) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_palloc"); return NGX_ERROR; }
 //    psr->handler = ngx_http_evaluate_post_subrequest_handler;
 //    psr->data = context->values[context->location];
     ngx_str_t uri;
-    if (ngx_http_complex_value(r, &location[context->index].cv, &uri) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
+    if (ngx_http_complex_value(r, &location[context->location].cv, &uri) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_str_t args = r->args;
     ngx_http_request_t *subrequest;
     if (ngx_http_subrequest(r, &uri, &args, &subrequest, NULL, /*NGX_HTTP_SUBREQUEST_IN_MEMORY|*/NGX_HTTP_SUBREQUEST_WAITED) == NGX_ERROR) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_subrequest == NGX_ERROR"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_http_evaluate_context_t *subcontext = ngx_pcalloc(r->pool, sizeof(*subcontext));
     if (!subcontext) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
-    subcontext->index = location[context->index].index;
+    subcontext->index = context->index;
+    subcontext->location = context->location;
     subcontext->type = ngx_http_evaluate_subrequest;
     ngx_http_set_ctx(subrequest, subcontext, ngx_http_evaluate_module);
-    context->index++;
+    context->location++;
     return NGX_DONE;
 }
 
@@ -128,11 +131,11 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
 
 static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_t *in) {
     if (r == r->main) return ngx_http_next_body_filter(r, in);
-    ngx_http_evaluate_context_t *context = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
-    if (!context) return ngx_http_next_body_filter(r, in);
-    if (context->type != ngx_http_evaluate_subrequest) return ngx_http_next_body_filter(r, in);
+    ngx_http_evaluate_context_t *subcontext = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
+    if (!subcontext) return ngx_http_next_body_filter(r, in);
+    if (subcontext->type != ngx_http_evaluate_subrequest) return ngx_http_next_body_filter(r, in);
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
-    ngx_http_variable_value_t *value = r->variables + context->index;
+    ngx_http_variable_value_t *value = r->variables + subcontext->index;
     for (ngx_chain_t *cl = in; cl; cl = cl->next) {
         if (!ngx_buf_in_memory(cl->buf)) continue;
         value->len += cl->buf->last - cl->buf->pos;
@@ -148,8 +151,8 @@ static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_
     }
     value->not_found = 0;
     value->valid = 1;
-//    ngx_str_t v = {value->len, value->data};
-//    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "v = %V", &v);
+    ngx_str_t v = {value->len, value->data};
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "v = %V", &v);
     return NGX_OK;
 }
 
