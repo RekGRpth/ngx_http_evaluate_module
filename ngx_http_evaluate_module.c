@@ -149,6 +149,8 @@ static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_
     }
     value->not_found = 0;
     value->valid = 1;
+//    ngx_str_t v = {value->len, value->data};
+//    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "v = %V", &v);
     return NGX_OK;
 }
 
