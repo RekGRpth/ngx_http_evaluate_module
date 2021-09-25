@@ -92,24 +92,23 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
     ngx_http_evaluate_location_t *location = loc_conf->location->elts;
     ngx_http_evaluate_context_t *context = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
-    if (!context) {
-        if (!(context = ngx_pcalloc(r->pool, sizeof(*context)))) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_ERROR; }
+    if (!context || context->type != ngx_http_evaluate_request) {
+        if (!(context = ngx_pcalloc(r->pool, sizeof(*context)))) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
         context->type = ngx_http_evaluate_request;
         ngx_http_set_ctx(r, context, ngx_http_evaluate_module);
     }
-    if (context->type != ngx_http_evaluate_request) return NGX_DECLINED;
     if (context->index == loc_conf->location->nelts) return /*context->rc == NGX_OK || context->rc == NGX_HTTP_OK ? */NGX_DECLINED/* : context->rc*/;
 //    ngx_http_post_subrequest_t *psr = ngx_palloc(r->pool, sizeof(*psr));
 //    if (!psr) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_palloc"); return NGX_ERROR; }
 //    psr->handler = ngx_http_evaluate_post_subrequest_handler;
 //    psr->data = context->values[context->location];
     ngx_str_t uri;
-    if (ngx_http_complex_value(r, &location[context->index].cv, &uri) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_ERROR; }
+    if (ngx_http_complex_value(r, &location[context->index].cv, &uri) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_str_t args = r->args;
     ngx_http_request_t *subrequest;
-    if (ngx_http_subrequest(r, &uri, &args, &subrequest, NULL, NGX_HTTP_SUBREQUEST_IN_MEMORY|NGX_HTTP_SUBREQUEST_WAITED) == NGX_ERROR) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_subrequest == NGX_ERROR"); return NGX_ERROR; }
+    if (ngx_http_subrequest(r, &uri, &args, &subrequest, NULL, /*NGX_HTTP_SUBREQUEST_IN_MEMORY|*/NGX_HTTP_SUBREQUEST_WAITED) == NGX_ERROR) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_subrequest == NGX_ERROR"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_http_evaluate_context_t *subcontext = ngx_pcalloc(r->pool, sizeof(*subcontext));
-    if (!subcontext) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_ERROR; }
+    if (!subcontext) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     subcontext->index = location[context->index].index;
     subcontext->type = ngx_http_evaluate_subrequest;
     ngx_http_set_ctx(subrequest, subcontext, ngx_http_evaluate_module);
