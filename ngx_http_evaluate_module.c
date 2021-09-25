@@ -51,7 +51,7 @@ static char *ngx_http_evaluate_command(ngx_conf_t *cf, ngx_command_t *cmd, void 
 
 static ngx_command_t ngx_http_evaluate_commands[] = {
   { .name = ngx_string("evaluate"),
-    .type = NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE2,
+    .type = NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
     .set = ngx_http_evaluate_command,
     .conf = NGX_HTTP_LOC_CONF_OFFSET,
     .offset = 0,
