@@ -1,7 +1,6 @@
 #include <ngx_http.h>
 
 typedef struct {
-    ngx_flag_t done;
     ngx_uint_t index;
     ngx_uint_t location;
 } ngx_http_evaluate_context_t;
@@ -70,7 +69,7 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
         context->index = location[context->location].index;
         ngx_http_set_ctx(r, context, ngx_http_evaluate_module);
     }
-    if (context->done) return NGX_DECLINED;
+    if (context->location == loc_conf->location->nelts) return NGX_DECLINED;
     ngx_str_t uri;
     if (ngx_http_complex_value(r, &location[context->location].cv, &uri) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_str_t args = r->args;
@@ -86,7 +85,6 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
     subcontext->location = context->location;
     ngx_http_set_ctx(subrequest, subcontext, ngx_http_evaluate_module);
     context->location++;
-    if (context->location == loc_conf->location->nelts) context->done = 1;
     return NGX_DONE;
 }
 
