@@ -62,7 +62,7 @@ static ngx_command_t ngx_http_evaluate_commands[] = {
 static ngx_int_t ngx_http_evaluate_post_subrequest_handler(ngx_http_request_t *r, void *data, ngx_int_t rc) {
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "rc = %i", rc);
     ngx_http_evaluate_context_t *context = ngx_http_get_module_ctx(r->main, ngx_http_evaluate_module);
-    if (context->rc == NGX_OK || context->rc == NGX_HTTP_OK) context->rc = rc;
+    if (context->rc < NGX_HTTP_SPECIAL_RESPONSE) context->rc = rc;
     return rc;
 }
 
@@ -77,7 +77,7 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
         context->index = location[context->location].index;
         ngx_http_set_ctx(r, context, ngx_http_evaluate_module);
     }
-    if (context->location == loc_conf->location->nelts) return context->rc == NGX_OK || context->rc == NGX_HTTP_OK ? NGX_DECLINED : context->rc;
+    if (context->location == loc_conf->location->nelts) return context->rc < NGX_HTTP_SPECIAL_RESPONSE ? NGX_DECLINED : context->rc;
     ngx_str_t uri;
     if (ngx_http_complex_value(r, &location[context->location].cv, &uri) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_str_t args = r->args;
