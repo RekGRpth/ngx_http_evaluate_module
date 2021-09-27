@@ -1,7 +1,6 @@
 #include <ngx_http.h>
 
 typedef struct {
-    ngx_chain_t *cl;
     ngx_int_t rc;
     ngx_uint_t index;
     ngx_uint_t location;
@@ -66,7 +65,7 @@ static ngx_int_t ngx_http_evaluate_post_subrequest_handler(ngx_http_request_t *r
     ngx_http_evaluate_context_t *subcontext = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
     if (context->rc < NGX_HTTP_SPECIAL_RESPONSE) context->rc = rc;
     ngx_http_variable_value_t *value = r->variables + subcontext->index;
-    for (ngx_chain_t *cl = subcontext->cl; cl; cl = cl->next) {
+    for (ngx_chain_t *cl = r->out; cl; cl = cl->next) {
         if (!ngx_buf_in_memory(cl->buf)) continue;
         value->len += cl->buf->last - cl->buf->pos;
     }
@@ -74,7 +73,7 @@ static ngx_int_t ngx_http_evaluate_post_subrequest_handler(ngx_http_request_t *r
     if (!(value->data = ngx_pnalloc(r->pool, value->len))) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pnalloc"); return NGX_ERROR; }
     u_char *p = value->data;
     size_t len;
-    for (ngx_chain_t *cl = subcontext->cl; cl; cl = cl->next) {
+    for (ngx_chain_t *cl = r->out; cl; cl = cl->next) {
         if (!ngx_buf_in_memory(cl->buf)) continue;
         if (!(len = cl->buf->last - cl->buf->pos)) continue;
         p = ngx_copy(p, cl->buf->pos, len);
@@ -122,7 +121,7 @@ static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_
     ngx_http_evaluate_context_t *subcontext = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
     if (!subcontext) return ngx_http_next_body_filter(r, in);
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
-    if (ngx_chain_add_copy(r->pool, &subcontext->cl, in) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_chain_add_copy != NGX_OK"); return NGX_ERROR; }
+    if (ngx_chain_add_copy(r->pool, &r->out, in) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_chain_add_copy != NGX_OK"); return NGX_ERROR; }
     return NGX_OK;
 }
 
