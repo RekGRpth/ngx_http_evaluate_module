@@ -107,7 +107,6 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
     if (ngx_http_subrequest(r, &uri, &args, &subrequest, psr, flags) == NGX_ERROR) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_subrequest == NGX_ERROR"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_http_evaluate_context_t *subcontext = ngx_pcalloc(r->pool, sizeof(*subcontext));
     if (!subcontext) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
-    subcontext->index = context->index;
     subcontext->index = location[context->location].index;
     subcontext->location = context->location;
     ngx_http_set_ctx(subrequest, subcontext, ngx_http_evaluate_module);
