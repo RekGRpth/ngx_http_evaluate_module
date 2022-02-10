@@ -65,6 +65,7 @@ static ngx_int_t ngx_http_evaluate_post_subrequest_handler(ngx_http_request_t *r
     ngx_http_evaluate_context_t *subcontext = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
     if (context->rc < NGX_HTTP_SPECIAL_RESPONSE) context->rc = rc;
     ngx_http_variable_value_t *value = r->variables + subcontext->index;
+    value->len = 0;
     for (ngx_chain_t *cl = r->out; cl; cl = cl->next) {
         if (!ngx_buf_in_memory(cl->buf)) continue;
         value->len += cl->buf->last - cl->buf->pos;
@@ -72,11 +73,9 @@ static ngx_int_t ngx_http_evaluate_post_subrequest_handler(ngx_http_request_t *r
     if (!value->len) return rc;
     if (!(value->data = ngx_pnalloc(r->pool, value->len))) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pnalloc"); return NGX_ERROR; }
     u_char *p = value->data;
-    size_t len;
     for (ngx_chain_t *cl = r->out; cl; cl = cl->next) {
         if (!ngx_buf_in_memory(cl->buf)) continue;
-        if (!(len = cl->buf->last - cl->buf->pos)) continue;
-        p = ngx_copy(p, cl->buf->pos, len);
+        p = ngx_copy(p, cl->buf->pos, cl->buf->last - cl->buf->pos);
     }
     value->not_found = 0;
     value->valid = 1;
