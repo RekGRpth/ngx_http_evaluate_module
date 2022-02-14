@@ -148,6 +148,25 @@ static void *ngx_http_location_create_loc_conf(ngx_conf_t *cf) {
     return loc_conf;
 }
 
+static ngx_int_t ngx_conf_merge_array_value(ngx_array_t **conf, ngx_array_t **prev, void *cmp) {
+    if (*conf == cmp || (*conf)->nelts == 0) {
+        *conf = *prev;
+    } else if (*prev != cmp && (*prev)->nelts) {
+        if ((*conf)->size != (*prev)->size) return NGX_ERROR;
+        ngx_uint_t orig_len = (*conf)->nelts;
+        if (!ngx_array_push_n(*conf, (*prev)->nelts)) return NGX_ERROR;
+        char *elts = (*conf)->elts;
+        for (ngx_uint_t i = 0; i < orig_len; i++) {
+            ngx_memcpy(elts + (*conf)->size * ((*conf)->nelts - 1 - i), elts + (*conf)->size * (orig_len - 1 - i), (*conf)->size);
+        }
+        char *prev_elts = (*prev)->elts;
+        for (ngx_uint_t i = 0; i < (*prev)->nelts; i++) {
+            ngx_memcpy(elts + (*prev)->size * i, prev_elts + (*prev)->size * i, (*prev)->size);
+        }
+    }
+    return NGX_OK;
+}
+
 static char *ngx_http_location_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     ngx_http_evaluate_loc_conf_t *prev = parent;
     ngx_http_evaluate_loc_conf_t *conf = child;
