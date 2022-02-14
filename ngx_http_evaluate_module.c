@@ -24,6 +24,11 @@ ngx_module_t ngx_http_evaluate_module;
 
 static ngx_http_output_body_filter_pt ngx_http_next_body_filter;
 
+static ngx_int_t ngx_http_rewrite_var(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data) {
+    *v = ngx_http_variable_null_value;
+    return NGX_OK;
+}
+
 static char *ngx_http_evaluate_command(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     ngx_http_evaluate_loc_conf_t *loc_conf = conf;
     ngx_http_evaluate_location_t *location;
@@ -38,10 +43,10 @@ static char *ngx_http_evaluate_command(ngx_conf_t *cf, ngx_command_t *cmd, void 
     ngx_http_variable_t *variable = ngx_http_add_variable(cf, &name, NGX_HTTP_VAR_CHANGEABLE);
     if (!variable) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "\"%V\" directive error: !ngx_http_add_variable", &cmd->name); return NGX_CONF_ERROR; }
     if (!(location->index = ngx_http_get_variable_index(cf, &name))) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "\"%V\" directive error: !ngx_http_get_variable_index", &cmd->name); return NGX_CONF_ERROR; }
-    /*if (!variable->get_handler && ngx_strncasecmp(name.data, (u_char *) "arg_", 4) && ngx_strncasecmp(name.data, (u_char *) "cookie_", 7) && ngx_strncasecmp(name.data, (u_char *) "http_", 5) && ngx_strncasecmp(name.data, (u_char *) "sent_http_", 10) && ngx_strncasecmp(name.data, (u_char *) "upstream_http_", 14)) {
+    if (!variable->get_handler && ngx_strncasecmp(name.data, (u_char *) "arg_", 4) && ngx_strncasecmp(name.data, (u_char *) "cookie_", 7) && ngx_strncasecmp(name.data, (u_char *) "http_", 5) && ngx_strncasecmp(name.data, (u_char *) "sent_http_", 10) && ngx_strncasecmp(name.data, (u_char *) "upstream_http_", 14)) {
         variable->get_handler = ngx_http_rewrite_var;
         variable->data = location->index;
-    }*/
+    }
     ngx_str_t value = args[2];
     ngx_http_compile_complex_value_t ccv = {cf, &value, &location->cv, 0, 0, 0};
     if (ngx_http_compile_complex_value(&ccv) != NGX_OK) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "\"%V\" directive error: ngx_http_compile_complex_value != NGX_OK", &cmd->name); return NGX_CONF_ERROR; }
