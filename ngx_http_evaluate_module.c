@@ -1,3 +1,4 @@
+#include <ndk.h>
 #include <ngx_http.h>
 
 typedef struct {
