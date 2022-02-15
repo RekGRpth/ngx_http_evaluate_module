@@ -182,7 +182,7 @@ static void *ngx_http_evaluate_create_main_conf(ngx_conf_t *cf) {
     return emcf;
 }
 
-static void *ngx_http_location_create_loc_conf(ngx_conf_t *cf) {
+static void *ngx_http_evaluate_create_loc_conf(ngx_conf_t *cf) {
     ngx_http_evaluate_loc_conf_t *elcf = ngx_pcalloc(cf->pool, sizeof(*elcf));
     if (!elcf) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_pcalloc"); return NULL; }
     elcf->location = NGX_CONF_UNSET_PTR;
@@ -208,7 +208,7 @@ static ngx_int_t ngx_conf_merge_array_value(ngx_array_t **conf, ngx_array_t **pr
     return NGX_OK;
 }
 
-static char *ngx_http_location_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
+static char *ngx_http_evaluate_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     ngx_http_evaluate_loc_conf_t *prev = parent;
     ngx_http_evaluate_loc_conf_t *conf = child;
     if (ngx_conf_merge_array_value(&conf->location, &prev->location, NGX_CONF_UNSET_PTR) != NGX_OK) return NGX_CONF_ERROR;
@@ -223,8 +223,8 @@ static ngx_http_module_t ngx_http_evaluate_ctx = {
     .init_main_conf = NULL,
     .create_srv_conf = NULL,
     .merge_srv_conf = NULL,
-    .create_loc_conf = ngx_http_location_create_loc_conf,
-    .merge_loc_conf = ngx_http_location_merge_loc_conf
+    .create_loc_conf = ngx_http_evaluate_create_loc_conf,
+    .merge_loc_conf = ngx_http_evaluate_merge_loc_conf
 };
 
 ngx_module_t ngx_http_evaluate_module = {
