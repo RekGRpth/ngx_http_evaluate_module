@@ -30,10 +30,10 @@ static ngx_int_t ngx_http_rewrite_var(ngx_http_request_t *r, ngx_http_variable_v
 }
 
 static char *ngx_http_evaluate_command(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-    ngx_http_evaluate_loc_conf_t *loc_conf = conf;
+    ngx_http_evaluate_loc_conf_t *elcf = conf;
     ngx_http_evaluate_location_t *location;
-    if (loc_conf->location == NGX_CONF_UNSET_PTR && !(loc_conf->location = ngx_array_create(cf->pool, 1, sizeof(*location)))) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_array_create"); return NGX_CONF_ERROR; }
-    if (!(location = ngx_array_push(loc_conf->location))) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "\"%V\" directive error: !ngx_array_push", &cmd->name); return NGX_CONF_ERROR; }
+    if (elcf->location == NGX_CONF_UNSET_PTR && !(elcf->location = ngx_array_create(cf->pool, 1, sizeof(*location)))) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_array_create"); return NGX_CONF_ERROR; }
+    if (!(location = ngx_array_push(elcf->location))) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "\"%V\" directive error: !ngx_array_push", &cmd->name); return NGX_CONF_ERROR; }
     ngx_memzero(location, sizeof(*location));
     ngx_str_t *args = cf->args->elts;
     ngx_str_t name = args[1];
@@ -50,8 +50,8 @@ static char *ngx_http_evaluate_command(ngx_conf_t *cf, ngx_command_t *cmd, void 
     ngx_str_t value = args[2];
     ngx_http_compile_complex_value_t ccv = {cf, &value, &location->cv, 0, 0, 0};
     if (ngx_http_compile_complex_value(&ccv) != NGX_OK) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "\"%V\" directive error: ngx_http_compile_complex_value != NGX_OK", &cmd->name); return NGX_CONF_ERROR; }
-    ngx_http_evaluate_main_conf_t *main_conf = ngx_http_conf_get_module_main_conf(cf, ngx_http_evaluate_module);
-    main_conf->enable = 1;
+    ngx_http_evaluate_main_conf_t *emcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_evaluate_module);
+    emcf->enable = 1;
     return NGX_CONF_OK;
 }
 
@@ -89,17 +89,17 @@ static ngx_int_t ngx_http_evaluate_post_subrequest_handler(ngx_http_request_t *r
 }
 
 static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
-    ngx_http_evaluate_loc_conf_t *loc_conf = ngx_http_get_module_loc_conf(r, ngx_http_evaluate_module);
-    if (loc_conf->location == NGX_CONF_UNSET_PTR) return NGX_DECLINED;
+    ngx_http_evaluate_loc_conf_t *elcf = ngx_http_get_module_loc_conf(r, ngx_http_evaluate_module);
+    if (elcf->location == NGX_CONF_UNSET_PTR) return NGX_DECLINED;
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
-    ngx_http_evaluate_location_t *location = loc_conf->location->elts;
+    ngx_http_evaluate_location_t *location = elcf->location->elts;
     ngx_http_evaluate_context_t *context = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
     if (!context) {
         if (!(context = ngx_pcalloc(r->pool, sizeof(*context)))) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_pcalloc"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
         context->index = location[context->location].index;
         ngx_http_set_ctx(r, context, ngx_http_evaluate_module);
     }
-    if (context->location == loc_conf->location->nelts) return context->rc < NGX_HTTP_SPECIAL_RESPONSE ? NGX_DECLINED : context->rc;
+    if (context->location == elcf->location->nelts) return context->rc < NGX_HTTP_SPECIAL_RESPONSE ? NGX_DECLINED : context->rc;
     ngx_str_t uri;
     if (ngx_http_complex_value(r, &location[context->location].cv, &uri) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_str_t args = r->args;
@@ -129,8 +129,8 @@ static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_
 }
 
 static ngx_int_t ngx_http_evaluate_postconfiguration(ngx_conf_t *cf) {
-    ngx_http_evaluate_main_conf_t *main_conf = ngx_http_conf_get_module_main_conf(cf, ngx_http_evaluate_module);
-    if (!main_conf->enable) return NGX_OK;
+    ngx_http_evaluate_main_conf_t *emcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_evaluate_module);
+    if (!emcf->enable) return NGX_OK;
     ngx_http_core_main_conf_t *cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
     ngx_http_handler_pt *handler = ngx_array_push(&cmcf->phases[NGX_HTTP_REWRITE_PHASE].handlers);
     if (!handler) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_array_push"); return NGX_ERROR; }
@@ -141,16 +141,16 @@ static ngx_int_t ngx_http_evaluate_postconfiguration(ngx_conf_t *cf) {
 }
 
 static void *ngx_http_evaluate_create_main_conf(ngx_conf_t *cf) {
-    ngx_http_evaluate_main_conf_t *main_conf = ngx_pcalloc(cf->pool, sizeof(*main_conf));
-    if (!main_conf) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_pcalloc"); return NULL; }
-    return main_conf;
+    ngx_http_evaluate_main_conf_t *emcf = ngx_pcalloc(cf->pool, sizeof(*emcf));
+    if (!emcf) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_pcalloc"); return NULL; }
+    return emcf;
 }
 
 static void *ngx_http_location_create_loc_conf(ngx_conf_t *cf) {
-    ngx_http_evaluate_loc_conf_t *loc_conf = ngx_pcalloc(cf->pool, sizeof(*loc_conf));
-    if (!loc_conf) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_pcalloc"); return NULL; }
-    loc_conf->location = NGX_CONF_UNSET_PTR;
-    return loc_conf;
+    ngx_http_evaluate_loc_conf_t *elcf = ngx_pcalloc(cf->pool, sizeof(*elcf));
+    if (!elcf) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_pcalloc"); return NULL; }
+    elcf->location = NGX_CONF_UNSET_PTR;
+    return elcf;
 }
 
 static ngx_int_t ngx_conf_merge_array_value(ngx_array_t **conf, ngx_array_t **prev, void *cmp) {
