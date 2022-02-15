@@ -14,10 +14,12 @@ typedef struct {
 
 typedef struct {
     ngx_array_t *location;
+    ngx_http_complex_value_t *name;
 } ngx_http_evaluate_loc_conf_t;
 
 typedef struct {
-    ngx_flag_t enable;
+    ngx_flag_t precontent;
+    ngx_flag_t rewrite;
 } ngx_http_evaluate_main_conf_t;
 
 ngx_module_t ngx_http_evaluate_module;
@@ -29,7 +31,7 @@ static ngx_int_t ngx_http_rewrite_var(ngx_http_request_t *r, ngx_http_variable_v
     return NGX_OK;
 }
 
-static char *ngx_http_evaluate_command(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+static char *ngx_http_evaluate_conf(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     ngx_http_evaluate_loc_conf_t *elcf = conf;
     ngx_http_evaluate_location_t *location;
     if (elcf->location == NGX_CONF_UNSET_PTR && !(elcf->location = ngx_array_create(cf->pool, 1, sizeof(*location)))) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_array_create"); return NGX_CONF_ERROR; }
@@ -51,16 +53,28 @@ static char *ngx_http_evaluate_command(ngx_conf_t *cf, ngx_command_t *cmd, void 
     ngx_http_compile_complex_value_t ccv = {cf, &value, &location->cv, 0, 0, 0};
     if (ngx_http_compile_complex_value(&ccv) != NGX_OK) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "\"%V\" directive error: ngx_http_compile_complex_value != NGX_OK", &cmd->name); return NGX_CONF_ERROR; }
     ngx_http_evaluate_main_conf_t *emcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_evaluate_module);
-    emcf->enable = 1;
+    emcf->rewrite = 1;
     return NGX_CONF_OK;
+}
+
+static char *ngx_http_evaluate_redirect_conf(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+    ngx_http_evaluate_main_conf_t *emcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_evaluate_module);
+    emcf->precontent = 1;
+    return ngx_http_set_complex_value_slot(cf, cmd, conf);
 }
 
 static ngx_command_t ngx_http_evaluate_commands[] = {
   { .name = ngx_string("evaluate"),
     .type = NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
-    .set = ngx_http_evaluate_command,
+    .set = ngx_http_evaluate_conf,
     .conf = NGX_HTTP_LOC_CONF_OFFSET,
     .offset = 0,
+    .post = NULL },
+  { .name = ngx_string("redirect"),
+    .type = NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE1,
+    .set = ngx_http_evaluate_redirect_conf,
+    .conf = NGX_HTTP_LOC_CONF_OFFSET,
+    .offset = offsetof(ngx_http_evaluate_loc_conf_t, name),
     .post = NULL },
     ngx_null_command
 };
@@ -88,7 +102,7 @@ static ngx_int_t ngx_http_evaluate_post_subrequest_handler(ngx_http_request_t *r
     return rc;
 }
 
-static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
+static ngx_int_t ngx_http_evaluate_rewrite_handler(ngx_http_request_t *r) {
     ngx_http_evaluate_loc_conf_t *elcf = ngx_http_get_module_loc_conf(r, ngx_http_evaluate_module);
     if (elcf->location == NGX_CONF_UNSET_PTR) return NGX_DECLINED;
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
@@ -119,6 +133,21 @@ static ngx_int_t ngx_http_evaluate_handler(ngx_http_request_t *r) {
     return NGX_DONE;
 }
 
+static ngx_int_t ngx_http_evaluate_precontent_handler(ngx_http_request_t *r) {
+    ngx_http_evaluate_loc_conf_t *elcf = ngx_http_get_module_loc_conf(r, ngx_http_evaluate_module);
+    if (!elcf->name) return NGX_DECLINED;
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
+    ngx_str_t name;
+    if (ngx_http_complex_value(r, elcf->name, &name) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_ERROR; }
+    if (name.data[0] == '@') (void)ngx_http_named_location(r, &name); else {
+        ngx_str_t args;
+        ngx_http_split_args(r, &name, &args);
+        (void)ngx_http_internal_redirect(r, &name, &args);
+    }
+    ngx_http_finalize_request(r, NGX_DONE);
+    return NGX_DONE;
+}
+
 static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_t *in) {
     if (r == r->main) return ngx_http_next_body_filter(r, in);
     ngx_http_evaluate_context_t *subcontext = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
@@ -130,13 +159,20 @@ static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_
 
 static ngx_int_t ngx_http_evaluate_postconfiguration(ngx_conf_t *cf) {
     ngx_http_evaluate_main_conf_t *emcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_evaluate_module);
-    if (!emcf->enable) return NGX_OK;
-    ngx_http_core_main_conf_t *cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
-    ngx_http_handler_pt *handler = ngx_array_push(&cmcf->phases[NGX_HTTP_REWRITE_PHASE].handlers);
-    if (!handler) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_array_push"); return NGX_ERROR; }
-    *handler = ngx_http_evaluate_handler;
-    ngx_http_next_body_filter = ngx_http_top_body_filter;
-    ngx_http_top_body_filter = ngx_http_evaluate_body_filter;
+    if (emcf->precontent) {
+        ngx_http_core_main_conf_t *cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+        ngx_http_handler_pt *handler = ngx_array_push(&cmcf->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
+        if (!handler) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_array_push"); return NGX_ERROR; }
+        *handler = ngx_http_evaluate_precontent_handler;
+    }
+    if (emcf->rewrite) {
+        ngx_http_core_main_conf_t *cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+        ngx_http_handler_pt *handler = ngx_array_push(&cmcf->phases[NGX_HTTP_REWRITE_PHASE].handlers);
+        if (!handler) { ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "!ngx_array_push"); return NGX_ERROR; }
+        *handler = ngx_http_evaluate_rewrite_handler;
+        ngx_http_next_body_filter = ngx_http_top_body_filter;
+        ngx_http_top_body_filter = ngx_http_evaluate_body_filter;
+    }
     return NGX_OK;
 }
 
@@ -176,6 +212,7 @@ static char *ngx_http_location_merge_loc_conf(ngx_conf_t *cf, void *parent, void
     ngx_http_evaluate_loc_conf_t *prev = parent;
     ngx_http_evaluate_loc_conf_t *conf = child;
     if (ngx_conf_merge_array_value(&conf->location, &prev->location, NGX_CONF_UNSET_PTR) != NGX_OK) return NGX_CONF_ERROR;
+    if (!conf->name) conf->name = prev->name;
     return NGX_CONF_OK;
 }
 
