@@ -172,7 +172,7 @@ static ngx_int_t ngx_http_evaluate_body_filter(ngx_http_request_t *r, ngx_chain_
     ngx_http_evaluate_context_t *subcontext = ngx_http_get_module_ctx(r, ngx_http_evaluate_module);
     if (!subcontext) return ngx_http_next_body_filter(r, in);
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "%s", __func__);
-    if (ngx_chain_add_copy_buf(r->pool, &r->out, in) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_chain_add_copy != NGX_OK"); return NGX_ERROR; }
+    if (ngx_chain_add_copy_buf(r->pool, &r->out, in) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_chain_add_copy_buf != NGX_OK"); return NGX_ERROR; }
     return NGX_OK;
 }
 
