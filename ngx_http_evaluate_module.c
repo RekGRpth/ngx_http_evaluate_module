@@ -117,7 +117,7 @@ static ngx_int_t ngx_http_evaluate_rewrite_handler(ngx_http_request_t *r) {
     ngx_str_t uri;
     if (ngx_http_complex_value(r, &location[context->location].cv, &uri) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_str_t args = r->args;
-    ngx_uint_t flags = 0;
+    ngx_uint_t flags = NGX_HTTP_SUBREQUEST_IN_MEMORY;
     if (ngx_http_parse_unsafe_uri(r, &uri, &args, &flags) != NGX_OK) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_complex_value != NGX_OK"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     ngx_http_post_subrequest_t *psr = ngx_palloc(r->pool, sizeof(*psr));
     if (!psr) { ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "!ngx_palloc"); return NGX_HTTP_INTERNAL_SERVER_ERROR; }
